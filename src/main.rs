@@ -5,20 +5,6 @@ use rocket::serde::json::Json;
 use serde::Serialize;
 use rand::Rng;
 use tokio::task;
-use opentelemetry::global::ObjectSafeSpan;
-use opentelemetry::trace::{SpanKind, Status};
-use opentelemetry::{global, trace::Tracer};
-use opentelemetry_sdk::propagation::TraceContextPropagator;
-use opentelemetry_sdk::trace::TracerProvider;
-use opentelemetry_stdout::SpanExporter;
-
-fn init_tracer() {
-    global::set_text_map_propagator(TraceContextPropagator::new());
-    let provider = TracerProvider::builder()
-        .with_simple_exporter(SpanExporter::default())
-        .build();
-    global::set_tracer_provider(provider);
-}
 
 #[derive(Serialize, Debug)]
 pub struct PriceResult {
@@ -42,24 +28,14 @@ fn get_price_from_db(id: i32) -> PriceResult {
 
 #[get("/price?<id>")]
 async fn get_price(id: i32) -> Result<Json<PriceResult>, rocket::response::status::Custom<String>> {
-    let tracer = global::tracer("pricing_service");     // spanScope
-    let mut span = tracer
-        .span_builder(format!("get price for id: {}", id))
-        .with_kind(SpanKind::Server)
-        .start(&tracer);
-
     println!("Current thread: {:?}", std::thread::current().id());
     let price_result = task::spawn_blocking(move || get_price_from_db(id))
         .await
         .map_err(|e| rocket::response::status::Custom(rocket::http::Status::InternalServerError, e.to_string()))?;
-    
-    // Set span status to Ok after successful price retrieval
-    span.set_status(Status::Ok);
     Ok(Json(price_result))
 }
 
 #[launch]
 fn rocket() -> _ {
-    init_tracer();
     rocket::build().mount("/", routes![get_price])
 }
