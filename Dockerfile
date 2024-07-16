@@ -11,10 +11,10 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
 # Build the application
-RUN cargo build --release -Z sparse-registry
+RUN cargo build --release 
 
 # Use the official Debian image for the final stage
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 
 # Copy the compiled binary from the build stage
 COPY --from=builder /usr/src/pricing_application/target/release/pricing_rust /usr/local/bin/pricing_rust
